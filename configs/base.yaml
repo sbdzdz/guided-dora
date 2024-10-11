@@ -1,0 +1,42 @@
+# config.yaml
+defaults:
+  - override hydra/job_logging: default
+
+arch: "vit_small"
+patch_size: 16
+out_dim: 65536
+norm_last_layer: true
+momentum_teacher: 0.996
+use_bn_in_head: false
+
+# Teacher temperature params
+warmup_teacher_temp: 0.04
+teacher_temp: 0.04
+warmup_teacher_temp_epochs: 30
+
+# Optimization params
+use_fp16: true
+weight_decay: 0.04
+weight_decay_end: 0.4
+clip_grad: 3.0
+batch_size_per_gpu: 64
+epochs: 100
+freeze_last_layer: 1
+lr: 0.0005
+warmup_epochs: 10
+min_lr: 1e-6
+optimizer: "adamw"
+drop_path_rate: 0.1
+
+# Multi-crop params
+global_crops_scale: [0.4, 1.0]
+local_crops_number: 8
+local_crops_scale: [0.05, 0.4]
+
+# Miscellaneous params
+data_path: "/path/to/imagenet/train/"
+output_dir: "."
+saveckp_freq: 20
+seed: 0
+num_workers: 10
+dist_url: "env://"
