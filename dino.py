@@ -33,6 +33,31 @@ from torchvision import models as torchvision_models
 import utils
 import vision_transformer as vits
 from vision_transformer import DINOHead
+import logging
+
+from tqdm import tqdm, trange
+import wandb
+
+
+def setup_logger(output_dir):
+    logger = logging.getLogger(__name__)
+    logger.setLevel(logging.DEBUG)
+    output_dir = Path(output_dir).resolve() / datetime.datetime.now().strftime(
+        "%Y%m%d_%H%M%S"
+    )
+    if not output_dir.exists():
+        output_dir.mkdir(parents=True)
+    file_handler = logging.FileHandler(output_dir / "dino_training.log")
+    console_handler = logging.StreamHandler()
+    formatter = logging.Formatter(
+        "%(asctime)s - %(name)s - %(levelname)s - %(message)s"
+    )
+    file_handler.setFormatter(formatter)
+    console_handler.setFormatter(formatter)
+    logger.addHandler(file_handler)
+    logger.addHandler(console_handler)
+    return logger
+
 
 torchvision_archs = sorted(
     name
@@ -95,6 +120,16 @@ def get_args_parser():
         default=False,
         type=utils.bool_flag,
         help="Whether to use batch normalizations in projection head (Default: False)",
+    )
+
+    # wandb
+    parser.add_argument("--entity", default="aalto_ml", type=str, help="wandb entity")
+    parser.add_argument(
+        "--project", default="ssl_nat_aug", type=str, help="wandb project"
+    )
+    parser.add_argument("--name", default="dino_base", type=str, help="wandb run name")
+    parser.add_argument(
+        "--use_wandb", default=True, action="store_true", help="use wandb"
     )
 
     # Temperature teacher parameters
@@ -265,7 +300,7 @@ def get_args_parser():
     return parser
 
 
-def train_dino(args):
+def train_dino(args, logger):
     utils.init_distributed_mode(args)
     utils.fix_random_seeds(args.seed)
     print("git:\n  {}\n".format(utils.get_sha()))
@@ -280,7 +315,10 @@ def train_dino(args):
         args.local_crops_scale,
         args.local_crops_number,
     )
-    dataset = datasets.ImageFolder(args.data_path, transform=transform)
+    # dataset = datasets.ImageFolder(args.data_path, transform=transform)
+    data_path = Path(args.data_path).resolve()
+    logger.debug(data_path)
+    dataset = datasets.ImageNet(root=str(data_path), split="train", transform=transform)
     sampler = torch.utils.data.DistributedSampler(dataset, shuffle=True)
     data_loader = torch.utils.data.DataLoader(
         dataset,
@@ -339,6 +377,11 @@ def train_dino(args):
     )
     # move networks to gpu
     student, teacher = student.cuda(), teacher.cuda()
+
+    if torch.cuda.is_available():
+        student = torch.compile(student)
+        teacher = torch.compile(teacher)
+
     # synchronize batch norms (if any)
     if utils.has_batchnorms(student):
         student = nn.SyncBatchNorm.convert_sync_batchnorm(student)
@@ -382,7 +425,7 @@ def train_dino(args):
     # for mixed precision training
     fp16_scaler = None
     if args.use_fp16:
-        fp16_scaler = torch.cuda.amp.GradScaler()
+        fp16_scaler = torch.amp.GradScaler("cuda", enabled=True)
 
     # ============ init schedulers ... ============
     lr_schedule = utils.cosine_scheduler(
@@ -421,7 +464,7 @@ def train_dino(args):
 
     start_time = time.time()
     print("Starting DINO training !")
-    for epoch in range(start_epoch, args.epochs):
+    for epoch in trange(start_epoch, args.epochs, ncols=100, desc="Epochs"):
         data_loader.sampler.set_epoch(epoch)
 
         # ============ training one epoch of DINO ... ============
@@ -483,8 +526,9 @@ def train_one_epoch(
     args,
 ):
     metric_logger = utils.MetricLogger(delimiter="  ")
-    header = "Epoch: [{}/{}]".format(epoch, args.epochs)
-    for it, (images, _) in enumerate(metric_logger.log_every(data_loader, 10, header)):
+    pbar = tqdm(data_loader, ncols=100, desc="Training")
+
+    for it, (images, _) in enumerate(pbar):
         # update weight decay and learning rate according to their schedule
         it = len(data_loader) * epoch + it  # global training iteration
         for i, param_group in enumerate(optimizer.param_groups):
@@ -494,13 +538,23 @@ def train_one_epoch(
 
         # move images to gpu
         images = [im.cuda(non_blocking=True) for im in images]
-        # teacher and student forward passes + compute dino loss
-        with torch.cuda.amp.autocast(fp16_scaler is not None):
+        with torch.amp.autocast("cuda", enabled=fp16_scaler is not None):
             teacher_output = teacher(
                 images[:2]
             )  # only the 2 global views pass through the teacher
             student_output = student(images)
             loss = dino_loss(student_output, teacher_output, epoch)
+
+        pbar.set_postfix(loss=f"{loss.item():.4f}")
+        if utils.is_main_process():
+            if args.use_wandb:
+                wandb.log(
+                    {
+                        "train/loss": loss.item(),
+                        "train/lr": optimizer.param_groups[0]["lr"],
+                        "train/wd": optimizer.param_groups[0]["weight_decay"],
+                    }
+                )
 
         if not math.isfinite(loss.item()):
             print("Loss is {}, stopping training".format(loss.item()), force=True)
@@ -508,7 +562,6 @@ def train_one_epoch(
 
         # student update
         optimizer.zero_grad()
-        param_norms = None
         if fp16_scaler is None:
             loss.backward()
             if args.clip_grad:
@@ -685,5 +738,20 @@ class DataAugmentationDINO(object):
 if __name__ == "__main__":
     parser = argparse.ArgumentParser("DINO", parents=[get_args_parser()])
     args = parser.parse_args()
+
+    logger = setup_logger(args.output_dir)
+    logger.info(f"Arguments: {args}")
+
     Path(args.output_dir).mkdir(parents=True, exist_ok=True)
-    train_dino(args)
+
+    # if args.local_rank == 0:  # only on main process
+    if utils.is_main_process():
+        # Initialize wandb run
+        if args.use_wandb:
+            print(f"{utils.is_main_process()} {utils.get_rank()}")
+            run = wandb.init(
+                entity=args.entity,
+                project=args.project,
+                name=args.name,
+            )
+    train_dino(args, logger)
