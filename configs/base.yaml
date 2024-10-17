@@ -1,42 +1,38 @@
-# config.yaml
 defaults:
-  - override hydra/job_logging: default
+  - override hydra/job_logging: disabled
+  - override hydra/hydra_logging: disabled
 
-arch: "vit_small"
+output_dir: ./
+data_path: /path/to/imagenet/train
+epochs: 100
+batch_size_per_gpu: 64
+arch: vit_small
 patch_size: 16
 out_dim: 65536
-norm_last_layer: true
+norm_last_layer: True
 momentum_teacher: 0.996
-use_bn_in_head: false
-
-# Teacher temperature params
+use_bn_in_head: False
 warmup_teacher_temp: 0.04
 teacher_temp: 0.04
-warmup_teacher_temp_epochs: 30
-
-# Optimization params
-use_fp16: true
+warmup_teacher_temp_epochs: 0
+use_fp16: True
 weight_decay: 0.04
 weight_decay_end: 0.4
 clip_grad: 3.0
-batch_size_per_gpu: 64
-epochs: 100
 freeze_last_layer: 1
 lr: 0.0005
 warmup_epochs: 10
 min_lr: 1e-6
-optimizer: "adamw"
+optimizer: adamw
 drop_path_rate: 0.1
-
-# Multi-crop params
 global_crops_scale: [0.4, 1.0]
 local_crops_number: 8
 local_crops_scale: [0.05, 0.4]
-
-# Miscellaneous params
-data_path: "/path/to/imagenet/train/"
-output_dir: "."
 saveckp_freq: 20
 seed: 0
 num_workers: 10
-dist_url: "env://"
+dist_url: env://
+entity: aalto_ml
+project: ssl_nat_aug
+name: dino_base
+use_wandb: true
