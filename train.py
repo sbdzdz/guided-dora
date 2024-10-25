@@ -10,7 +10,7 @@ from pytorch_lightning.callbacks import ModelCheckpoint
 from lightly.transforms.dino_transform import DINOTransform
 from lightly.transforms.utils import IMAGENET_NORMALIZE
 
-from methods import DINO
+from methods import Dora
 
 import os
 import wandb
@@ -81,11 +81,7 @@ def main(cfg: DictConfig):
             persistent_workers=False,
         )
 
-    model = DINO(
-        backbone=cfg.backbone,
-        batch_size_per_device=cfg.batch_size_per_device,
-        num_classes=cfg.num_classes
-    )
+    model = Dora(backbone=cfg.backbone, batch_size_per_device=cfg.batch_size_per_device, num_classes=cfg.num_classes)
 
     name = "dino-petface-nat" if cfg.natural_augmentation else "dino-petface"
     checkpoint_callback = ModelCheckpoint(every_n_train_steps=10, dirpath=f'logs/nat_aug/{name}')
