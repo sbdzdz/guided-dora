@@ -106,12 +106,6 @@ class DINO(LightningModule):
             student_out=student_projections.chunk(len(views)),
             epoch=self.current_epoch,
         )
-        self.log_dict(
-            {"train/loss": loss, "train/ema_momentum": momentum},
-            prog_bar=True,
-            sync_dist=True,
-            batch_size=len(targets),
-        )
 
         # Online classification.
         cls_loss, cls_log = self.online_classifier.training_step(
