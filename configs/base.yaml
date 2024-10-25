@@ -1,38 +1,30 @@
 defaults:
   - override hydra/job_logging: disabled
-  - override hydra/hydra_logging: disabled
 
-output_dir: ./
-data_path: /path/to/imagenet/train
-epochs: 100
-batch_size_per_gpu: 64
-arch: vit_small
-patch_size: 16
-out_dim: 65536
-norm_last_layer: True
-momentum_teacher: 0.996
-use_bn_in_head: False
-warmup_teacher_temp: 0.04
-teacher_temp: 0.04
-warmup_teacher_temp_epochs: 0
-use_fp16: True
-weight_decay: 0.04
-weight_decay_end: 0.4
-clip_grad: 3.0
-freeze_last_layer: 1
-lr: 0.0005
-warmup_epochs: 10
-min_lr: 1e-6
-optimizer: adamw
-drop_path_rate: 0.1
-global_crops_scale: [0.4, 1.0]
-local_crops_number: 8
-local_crops_scale: [0.05, 0.4]
-saveckp_freq: 20
 seed: 0
-num_workers: 10
-dist_url: env://
-entity: aalto_ml
-project: ssl_nat_aug
-name: dino_base
-use_wandb: true
+fast_dev_run: false
+limit_train_batches: null
+method: simclr
+log_dir: ./logs
+data_dir: ~/projects/ocl/data/PetFace/
+use_wandb: false
+resume_chkpt: null
+backbone: resnet18
+max_epochs: 10
+batch_size_per_device: 512
+num_workers: 16
+skip_validation: false
+natural_augmentation: false
+input_size: 224
+cj_prob: 0.8
+cj_strength: 1.0
+cj_bright: 0.8
+cj_contrast: 0.8
+cj_sat: 0.8
+cj_hue: 0.2
+min_scale: 0.08
+random_gray_scale: 0.2
+gaussian_blur: 0.5
+accelerator: gpu
+devices: 2
+ckpt_path: null
