@@ -4,7 +4,6 @@ defaults:
 seed: 0
 fast_dev_run: false
 limit_train_batches: null
-method: simclr
 log_dir: ./logs
 data_dir: ~/projects/ocl/data/PetFace/
 use_wandb: false
@@ -14,7 +13,6 @@ max_epochs: 10
 batch_size_per_device: 512
 num_workers: 16
 skip_validation: false
-natural_augmentation: false
 input_size: 224
 cj_prob: 0.8
 cj_strength: 1.0

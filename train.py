@@ -6,13 +6,11 @@ from torchvision import transforms as T
 import pytorch_lightning as pl
 from pytorch_lightning.loggers import WandbLogger
 from pytorch_lightning.callbacks import ModelCheckpoint
-from lightly.transforms.simclr_transform import SimCLRTransform
 from lightly.transforms.dino_transform import DINOTransform
-from lightly.transforms.msn_transform import MSNTransform
 from lightly.transforms.utils import IMAGENET_NORMALIZE
 
-from methods import SimCLR, VICReg, DINO, PMSN
-from transforms import DINONaturalTransform, SimCLRNaturalTransform, MSNNaturalTransform
+from methods import DINO
+from transforms import DINONaturalTransform
 from petface import PetFaceDataset
 
 import os
@@ -20,75 +18,26 @@ import wandb
 import hydra
 from omegaconf import DictConfig
 
-os.environ["WANDB__SERVICE_WAIT"] = "300"
-TRAIN_SPLIT = ['cat', 'chimp', 'chinchilla', 'degus', 'dog', 'ferret', 'guineapig', 'hamster__', 'hedgehog__', 'javasparrow__', 'parakeet', 'pig', 'rabbit']
-VAL_SPLIT = ['cat', 'chimp', 'chinchilla', 'degus', 'dog', 'ferret', 'guineapig', 'hamster', 'hedgehog', 'javasparrow', 'parakeet', 'pig', 'rabbit']
-TEST_SPLIT = ['hamster', 'hedgehog', 'javasparrow']
-
 @hydra.main(config_path="config", config_name="base")
 def main(cfg: DictConfig):
     print(f"Configuration: {cfg}")
 
-    #### Set seed for reproducibility
-    if cfg.seed != -1:
+    if cfg.seed is not None:
         pl.seed_everything(cfg.seed, workers=True)
 
-    #### Set up Weights & Biases logger
     if cfg.use_wandb:
         wandb_logger = WandbLogger(
             project="nat_aug",
-            name=f"{cfg.method}_petface-nat" if cfg.natural_augmentation else f"{cfg.method}_petface",
+            name=f"dino_petface-nat" if cfg.natural_augmentation else "dino_petface",
             save_dir=cfg.log_dir,
         )
     else:
         wandb_logger = None
 
-    #### Select the typology of augmentation to use in the experiment
-    if cfg.method in ["simclr", "vicreg"]:
-        if cfg.natural_augmentation:
-            transform = SimCLRNaturalTransform(
-                input_size=cfg.input_size,
-                cj_prob=cfg.cj_prob,
-                cj_strength=cfg.cj_strength,
-                cj_bright=cfg.cj_bright,
-                cj_contrast=cfg.cj_contrast,
-                cj_sat=cfg.cj_sat,
-                cj_hue=cfg.cj_hue,
-                min_scale=cfg.min_scale,
-                random_gray_scale=cfg.random_gray_scale,
-                gaussian_blur=cfg.gaussian_blur,
-            )
-        else:
-            transform = SimCLRTransform(
-                input_size=cfg.input_size,
-                cj_prob=cfg.cj_prob,
-                cj_strength=cfg.cj_strength,
-                cj_bright=cfg.cj_bright,
-                cj_contrast=cfg.cj_contrast,
-                cj_sat=cfg.cj_sat,
-                cj_hue=cfg.cj_hue,
-                min_scale=cfg.min_scale,
-                random_gray_scale=cfg.random_gray_scale,
-                gaussian_blur=cfg.gaussian_blur,
-            )
-    elif cfg.method == "dino":
-        if cfg.natural_augmentation:
-            transform = DINONaturalTransform(
-                global_crop_scale=(0.14, 1),
-                local_crop_scale=(0.05, 0.14)
-            )
-        else:
-            transform = DINOTransform(
-                global_crop_scale=(0.14, 1),
-                local_crop_scale=(0.05, 0.14)
-            )
-    elif cfg.method == "pmsn":
-        if cfg.natural_augmentation:
-            transform = MSNNaturalTransform()
-        else:
-            transform = MSNTransform()
-    else:
-        raise ValueError(f"No augmentations implemented for {cfg.method}")
+    transform = DINOTransform(
+        global_crop_scale=(0.14, 1),
+        local_crop_scale=(0.05, 0.14)
+    )
 
     #### Create Dataset and DataLoaders
     cfg.data_dir = pathlib.Path(cfg.data_dir).expanduser().resolve()
@@ -130,31 +79,13 @@ def main(cfg: DictConfig):
             persistent_workers=False,
         )
 
-    if cfg.method == "simclr":
-        model = SimCLR(
-            backbone=cfg.backbone,
-            batch_size_per_device=cfg.batch_size_per_device,
-            num_classes=cfg.num_classes,
-        )
-    elif cfg.method == "vicreg":
-        model = VICReg(
-            backbone=cfg.backbone,
-            batch_size_per_device=cfg.batch_size_per_device,
-            num_classes=cfg.num_classes,
-        )
-    elif cfg.method == "dino":
-        model = DINO(
-            backbone=cfg.backbone,
-            batch_size_per_device=cfg.batch_size_per_device,
-            num_classes=cfg.num_classes
-        )
-    elif cfg.method == "pmsn":
-        model = PMSN(
-            batch_size_per_device=cfg.batch_size_per_device,
-            num_classes=cfg.num_classes
-        )
+    model = DINO(
+        backbone=cfg.backbone,
+        batch_size_per_device=cfg.batch_size_per_device,
+        num_classes=cfg.num_classes
+    )
 
-    name=f"{cfg.method}-petface-nat" if cfg.natural_augmentation else f"{cfg.method}-petface"
+    name = "dino-petface-nat" if cfg.natural_augmentation else "dino-petface"
     checkpoint_callback = ModelCheckpoint(every_n_train_steps=10, dirpath=f'logs/nat_aug/{name}')
 
     trainer = pl.Trainer(
