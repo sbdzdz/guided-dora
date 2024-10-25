@@ -2,6 +2,7 @@ import pathlib
 import torch
 from torch.utils.data import DataLoader
 from torchvision import transforms as T
+from torchvision.datasets import Cityscapes
 
 import pytorch_lightning as pl
 from pytorch_lightning.loggers import WandbLogger
@@ -10,8 +11,6 @@ from lightly.transforms.dino_transform import DINOTransform
 from lightly.transforms.utils import IMAGENET_NORMALIZE
 
 from methods import DINO
-from transforms import DINONaturalTransform
-from petface import PetFaceDataset
 
 import os
 import wandb
@@ -39,14 +38,13 @@ def main(cfg: DictConfig):
         local_crop_scale=(0.05, 0.14)
     )
 
-    #### Create Dataset and DataLoaders
     cfg.data_dir = pathlib.Path(cfg.data_dir).expanduser().resolve()
-    train_dataset = PetFaceDataset(
+    train_dataset = Cityscapes(
         root=cfg.data_dir,
-        split="train",
+        split='train',
+        mode='fine',
+        target_type='semantic',
         transform=transform,
-        natural_augmentation=cfg.natural_augmentation,
-        class_names=TRAIN_SPLIT,
     )
     cfg.num_classes = len(train_dataset.classes)
     train_dataloader = DataLoader(
@@ -68,8 +66,12 @@ def main(cfg: DictConfig):
                 T.Normalize(mean=IMAGENET_NORMALIZE["mean"], std=IMAGENET_NORMALIZE["std"]),
             ]
         )
-        val_dataset = PetFaceDataset(
-            root=cfg.data_dir, split="val", transform=val_transform, class_names=VAL_SPLIT
+        val_dataset = Cityscapes(
+            root=cfg.data_dir,
+            split='val',
+            mode='fine',
+            target_type='semantic',
+            transform=val_transform,
         )
         val_dataloader = DataLoader(
             val_dataset,
