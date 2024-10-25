@@ -1,2 +1,2 @@
-# guided-dora
-DoRA with a tracking oracle.
+# Seguidora: Segmentation-Guided DoRA
+DoRA with a segmentation oracle.
