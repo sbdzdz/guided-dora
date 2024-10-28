@@ -4,7 +4,7 @@ import torch
 import torch.nn as nn
 import torch.nn.functional as F
 import random
-from dino import DINO
+from seguidora.methods.dino import DINO
 from lightly.utils.scheduler import cosine_schedule
 from lightly.models.utils import update_momentum
 
