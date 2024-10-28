@@ -10,14 +10,14 @@ from pytorch_lightning.callbacks import ModelCheckpoint
 from lightly.transforms.dino_transform import DINOTransform
 from lightly.transforms.utils import IMAGENET_NORMALIZE
 
-from methods import Dora
+from seguidora.methods import Seguidora
 
 import os
 import wandb
 import hydra
 from omegaconf import DictConfig
 
-@hydra.main(config_path="config", config_name="base")
+@hydra.main(config_path="configs", config_name="base")
 def main(cfg: DictConfig):
     print(f"Configuration: {cfg}")
 

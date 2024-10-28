@@ -13,17 +13,18 @@ authors = [
 ]
 description = "Seguidora: Segmentation-Guided DoRA"
 readme = "README.md"
-requires-python = ">=3.10"
+requires-python = ">=3.11"
 dependencies = [
     "hydra-core",
     "lightning",
+    "lightly",
     "matplotlib",
     "torch",
     "torchvision",
 ]
 
 [tool.hatch.build]
-include = ["**/*.py"]
+include = ["seguidora/**/*.py"]
 
 [tool.ruff]
 select = ["E", "F", "B"]
