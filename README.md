@@ -16,7 +16,7 @@ source myenv/bin/activate
 Using conda:
 
 ```bash
-conda create -n myenv -f environment.yml python=3.11
+conda create -n myenv -f environment.yaml
 ```
 
 ### Install the package
